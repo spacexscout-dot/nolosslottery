@@ -1,10 +1,11 @@
 
-  import { defineConfig } from 'vite';
+import { defineConfig } from 'vite';
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
   export default defineConfig({
     plugins: [react()],
+
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -56,6 +57,29 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      commonjsOptions: {
+        transformMixedEsModules: true
+      },
+      sourcemap: false,
+      minify: 'esbuild',
+      rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('@aptos-labs/wallet-adapter-react')) {
+                return 'aptos-wallet-adapter';
+              }
+              if (id.includes('@telegram-apps/bridge')) {
+                return 'telegram-bridge';
+              }
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'react-vendor';
+              }
+              return 'vendor';
+            }
+          }
+        }
+      }
     },
     server: {
       port: 3000,

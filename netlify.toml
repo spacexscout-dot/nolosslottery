@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+# This ensures that routes like /about will work correctly with single-page apps
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

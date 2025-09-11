@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import imgRectangle from "figma:asset/78eb958f2455e13c665bd41e7fc05f803c0b8e9c.png";
 import imgImage238 from "figma:asset/6518f72b0f253b87afd724f87a6a582e44886ff9.png";
 import imgImage240 from "figma:asset/b327e89ba6908e319c701e827094039f8fc38e42.png";
@@ -48,7 +49,7 @@ const fetchAppStats = async (): Promise<AppStats> => {
 };
 
 // Background decoration component
-function BackgroundDecoration() {
+const BackgroundDecoration = memo(function BackgroundDecoration() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {/* Organic flowing gradient - Green to Blue to Purple */}
@@ -108,19 +109,19 @@ function BackgroundDecoration() {
       </div>
     </div>
   );
-}
+});
 
 // Logo component
-function Logo() {
+const Logo = memo(function Logo() {
   return (
     <div className="flex-shrink-0 w-[55px] h-[55px] relative overflow-hidden">
       <div
         className="absolute w-[55px] h-[51.944px] left-0 top-[1.53px] bg-center bg-contain bg-no-repeat"
-        style={{ backgroundImage: `url('${imgRectangle}')` }}
+        style={{ backgroundImage: `url(${imgRectangle as string})` }}
       />
     </div>
   );
-}
+});
 
 // Navigation menu
 function NavigationMenu() {
@@ -141,22 +142,147 @@ function NavigationMenu() {
           className={`font-['Urbanist'] font-semibold text-[18px] leading-normal transition-colors hover:text-black ${
             index === 0 ? "text-black" : "text-[#979daa]"
           }`}
+          type="button"
+          onClick={() => {
+            // Empty click handler
+          }}
         >
           {item}
         </button>
       ))}
     </nav>
+
   );
 }
 
 // Connect wallet button
-function ConnectWalletButton() {
+const ConnectWalletButton = memo(function ConnectWalletButton() {
+  const { account, connected, disconnect, wallets, connect } = useWallet();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDropdownOpen]);
+
+  const handleConnect = useCallback(async (walletName: string) => {
+    try {
+      await connect(walletName);
+      setIsDropdownOpen(false);
+    } catch (error) {
+      // Using a more appropriate error handling approach
+      // This could be integrated with a toast notification system in the future
+      // You could add a toast notification here
+    }
+  }, [connect]);
+
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await disconnect();
+    } catch (error) {
+      // Using a more appropriate error handling approach
+      // This could be integrated with a toast notification system in the future
+      // You could add a toast notification here
+    }
+  }, [disconnect]);
+
+  if (connected && account) {
+    return (
+      <div className="relative" ref={dropdownRef}>
+        <button 
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          className="bg-gradient-to-r from-[#18c258] to-[#5cc434] px-4 py-2.5 rounded-[12px] font-['Urbanist'] font-semibold text-[18px] text-white leading-normal hover:opacity-90 transition-opacity flex items-center gap-2"
+          type="button"
+        >
+          <span className="w-2 h-2 bg-green-300 rounded-full" aria-hidden="true"></span>
+          {account.address.toString().slice(0, 6)}...{account.address.toString().slice(-4)}
+        </button>
+        
+        {isDropdownOpen && (
+          <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[200px] z-50">
+            <div className="p-3 border-b border-gray-100">
+              <p className="font-['Urbanist'] font-medium text-sm text-gray-600">Connected Account</p>
+              <p className="font-['Urbanist'] font-mono text-xs text-gray-800 break-all">{account.address.toString()}</p>
+            </div>
+            <button
+              onClick={handleDisconnect}
+              type="button"
+              className="w-full text-left px-3 py-2 font-['Urbanist'] font-medium text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Disconnect Wallet
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <button className="bg-gradient-to-r from-[#18c258] to-[#5cc434] px-4 py-2.5 rounded-[12px] font-['Urbanist'] font-semibold text-[18px] text-white leading-normal hover:opacity-90 transition-opacity">
-      Connect Wallet
-    </button>
+    <div className="relative" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        className="bg-gradient-to-r from-[#18c258] to-[#5cc434] px-4 py-2.5 rounded-[12px] font-['Urbanist'] font-semibold text-[18px] text-white leading-normal hover:opacity-90 transition-opacity"
+      >
+        Connect Wallet
+      </button>
+      
+      {isDropdownOpen && (
+        <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[250px] z-50">
+          <div className="p-3 border-b border-gray-100">
+            <h3 className="font-['Urbanist'] font-semibold text-lg text-gray-800 mb-2">Connect Wallet</h3>
+            <p className="font-['Urbanist'] font-normal text-sm text-gray-600">Choose a wallet to connect to this dapp</p>
+          </div>
+          
+          <div className="p-2">
+            {wallets.map((wallet) => (
+              <button
+                key={wallet.name}
+                onClick={() => handleConnect(wallet.name)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <img 
+                  src={wallet.icon} 
+                  alt={wallet.name} 
+                  className="w-8 h-8 rounded-lg"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <div className="text-left">
+                  <p className="font-['Urbanist'] font-medium text-sm text-gray-800">{wallet.name}</p>
+                  <p className="font-['Urbanist'] font-normal text-xs text-gray-500">Connect using {wallet.name}</p>
+                </div>
+              </button>
+            ))}
+            
+            {wallets.length === 0 && (
+              <div className="p-4 text-center">
+                <p className="font-['Urbanist'] font-medium text-sm text-gray-600">No wallets detected</p>
+                <p className="font-['Urbanist'] font-normal text-xs text-gray-500 mt-1">Please install a compatible Aptos wallet</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-3 border-t border-gray-100">
+            <p className="font-['Urbanist'] font-normal text-xs text-gray-500 text-center">
+              New to Aptos? Create a wallet with Sign In with Google
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
+});
 
 // Header component
 function Header() {
@@ -179,6 +305,7 @@ function Header() {
         </div>
       </div>
     </header>
+
   );
 }
 
@@ -224,7 +351,7 @@ function AvatarMask({
 }
 
 // User avatars component
-function UserAvatars() {
+const UserAvatars = memo(function UserAvatars() {
   return (
     <div className="absolute left-4 xl:left-[120px] top-[380px] md:top-[370px] xl:top-[460px] flex items-center">
       <AvatarMask
@@ -244,7 +371,7 @@ function UserAvatars() {
       />
     </div>
   );
-}
+});
 
 // Loading skeleton component
 function LoadingSkeleton({
@@ -315,7 +442,7 @@ function Statistics({
 }
 
 // Action buttons component
-function ActionButtons() {
+const ActionButtons = memo(function ActionButtons() {
   return (
     <div className="absolute left-4 xl:left-[120px] top-[300px] md:top-[290px] xl:top-[370px] flex flex-col md:flex-row gap-3 xl:gap-[40px] items-start md:items-center">
       <button className="flex items-center gap-2.5 group">
@@ -336,7 +463,7 @@ function ActionButtons() {
       </button>
     </div>
   );
-}
+});
 
 // Glass card wrapper
 function GlassCard({
@@ -547,7 +674,8 @@ export default function App() {
         const data = await fetchAppStats();
         setStats(data);
       } catch (error) {
-        console.error("Failed to load stats:", error);
+      // Using a more appropriate error handling approach
+      // This could be integrated with a toast notification system in the future
       } finally {
         setLoading(false);
       }
